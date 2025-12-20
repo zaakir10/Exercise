@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Language Translator</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="app-container">
+        <header>
+            <h1>Translator</h1>
+        </header>
+
+        <main>
+            <div class="language-selection">
+                <div class="select-box">
+                    <label>From</label>
+                    <select id="fromLang">
+                        <option value="">Detecting...</option>
+                    </select>
+                </div>
+                
+                <div class="select-box">
+                    <label>To</label>
+                    <select id="toLang">
+                        </select>
+                </div>
+            </div>
+
+            <div class="input-section">
+                <label for="inputText">Enter Text</label>
+                <textarea id="inputText" placeholder="Enter text here..."></textarea>
+            </div>
+
+            <button id="translateBtn">Translate</button>
+
+            <div class="output-section">
+                <label>Translation Result</label>
+                <div class="result-box">
+                    <p id="translatedText">Output will appear here...</p>
+                </div>
+            </div>
+        </main>
+
+        <footer id="status">Ready</footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
