@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Announcements & Notices</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .notice-card {
+            border-left: 5px solid var(--primary);
+            margin-bottom: 1.5rem;
+            position: relative;
+            background: #fff;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            transition: transform 0.2s;
+        }
+        .notice-card:hover { transform: translateY(-3px); }
+        .notice-type-admin { border-left-color: #ef4444; } /* Red for Admin */
+        .notice-type-class { border-left-color: #10b981; } /* Green for Class */
+        .notice-date { font-size: 0.8rem; color: #64748b; margin-bottom: 5px; }
+        .delete-notice { position: absolute; top: 15px; right: 15px; cursor: pointer; opacity: 0.5; transition: 0.3s; }
+        .delete-notice:hover { opacity: 1; color: #ef4444; }
+        .notice-tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.7rem; font-weight: bold; margin-bottom: 8px; text-transform: uppercase; }
+        .tag-admin { background: #fee2e2; color: #991b1b; }
+        .tag-class { background: #dcfce7; color: #166534; }
+        .empty-state { text-align: center; padding: 3rem; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <nav class="sidebar" id="sidebar-container"></nav>
+
+        <main class="main-content">
+            <div class="top-bar">
+                <h1>Announcements & Notices</h1>
+                <button class="btn btn-primary" onclick="toggleNoticeForm()" id="toggleBtn">+ New Announcement</button>
+            </div>
+
+            <div id="noticeForm" class="card" style="display: none; margin-bottom: 2rem; border: 1px solid var(--primary);">
+                <h3 id="formTitle">Post New Announcement</h3>
+                <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                    <div class="form-group">
+                        <label>Notice Category</label>
+                        <select id="noticeType" class="form-control" onchange="toggleTargetSelect()">
+                            <option value="Admin">General (Everyone)</option>
+                            <option value="Class">Specific Class Only</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="classTargetGroup" style="display: none;">
+                        <label>Select Target Class</label>
+                        <select id="targetClass" class="form-control">
+                            </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notice Title</label>
+                    <input type="text" id="noticeTitle" class="form-control" placeholder="e.g., Final Exam Schedule 2025">
+                </div>
+                <div class="form-group">
+                    <label>Announcement Details</label>
+                    <textarea id="noticeContent" class="form-control" rows="4" placeholder="Write your message here..."></textarea>
+                </div>
+                <div class="flex" style="gap: 10px; margin-top: 10px;">
+                    <button class="btn btn-primary" onclick="saveNotice()">🚀 Post Notice</button>
+                    <button class="btn" onclick="toggleNoticeForm()">Cancel</button>
+                </div>
+            </div>
+
+            <div id="noticesFeed">
+                <div class="empty-state">Loading announcements...</div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        const NOTICE_KEY = 'sms_notices';
+
+        // 1. Improved Initialization
+        async function initNotices() {
+            try {
+                // Fetch classes from your specific DB_KEY
+                const classes = await api.get(DB_KEYS.CLASSES) || [];
+                const select = document.getElementById('targetClass');
+                
+                if (classes.length > 0) {
+                    select.innerHTML = classes.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+                } else {
+                    select.innerHTML = '<option value="">No classes found</option>';
+                }
+                
+                renderNotices();
+            } catch (e) {
+                console.error("Init Error:", e);
+            }
+        }
+
+        function toggleNoticeForm() {
+            const form = document.getElementById('noticeForm');
+            const btn = document.getElementById('toggleBtn');
+            const isHidden = form.style.display === 'none';
+            form.style.display = isHidden ? 'block' : 'none';
+            btn.innerText = isHidden ? '✕ Close Form' : '+ New Announcement';
+            btn.classList.toggle('btn-danger', isHidden);
+        }
+
+        function toggleTargetSelect() {
+            const type = document.getElementById('noticeType').value;
+            document.getElementById('classTargetGroup').style.display = type === 'Class' ? 'block' : 'none';
+        }
+
+        // 2. Enhanced Save with Form Reset
+        async function saveNotice() {
+            const title = document.getElementById('noticeTitle').value;
+            const content = document.getElementById('noticeContent').value;
+            const type = document.getElementById('noticeType').value;
+            const target = type === 'Class' ? document.getElementById('targetClass').value : 'All Students';
+
+            if(!title || !content) {
+                UI.showToast("Please fill in both title and content", "error");
+                return;
+            }
+
+            const notices = await api.get(NOTICE_KEY) || [];
+            const newNotice = {
+                id: Date.now(),
+                title,
+                content,
+                type,
+                target,
+                date: new Date().toLocaleDateString('en-US', { 
+                    month: 'short', 
+                    day: 'numeric', 
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                })
+            };
+
+            notices.unshift(newNotice);
+            localStorage.setItem(NOTICE_KEY, JSON.stringify(notices));
+
+            // Reset form
+            document.getElementById('noticeTitle').value = '';
+            document.getElementById('noticeContent').value = '';
+            toggleNoticeForm();
+            renderNotices();
+            UI.showToast("Announcement posted successfully!");
+        }
+
+        // 3. Modern Render
+        async function renderNotices() {
+            const notices = await api.get(NOTICE_KEY) || [];
+            const feed = document.getElementById('noticesFeed');
+            
+            if(notices.length === 0) {
+                feed.innerHTML = `
+                    <div class="empty-state">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">📭</div>
+                        <h3>No Announcements Yet</h3>
+                        <p>When you post a notice, it will appear here for students and staff.</p>
+                    </div>`;
+                return;
+            }
+
+            feed.innerHTML = notices.map(n => `
+                <div class="notice-card ${n.type === 'Admin' ? 'notice-type-admin' : 'notice-type-class'}">
+                    <span class="delete-notice" onclick="deleteNotice(${n.id})" title="Delete Notice">✕</span>
+                    <span class="notice-tag ${n.type === 'Admin' ? 'tag-admin' : 'tag-class'}">
+                        ${n.type === 'Admin' ? '📢 Admin' : '🏫 ' + n.target}
+                    </span>
+                    <div class="notice-date">${n.date}</div>
+                    <h3 style="margin: 5px 0 10px 0; color: #1e293b;">${n.title}</h3>
+                    <p style="line-height: 1.6; color: #475569;">${n.content}</p>
+                </div>
+            `).join('');
+        }
+
+        async function deleteNotice(id) {
+            if(!confirm("Are you sure you want to delete this announcement?")) return;
+            let notices = await api.get(NOTICE_KEY) || [];
+            notices = notices.filter(n => n.id !== id);
+            localStorage.setItem(NOTICE_KEY, JSON.stringify(notices));
+            renderNotices();
+            UI.showToast("Notice deleted");
+        }
+
+        document.addEventListener('DOMContentLoaded', initNotices);
+    </script>
+</body>
+</html>

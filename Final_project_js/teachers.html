@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teachers Management</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <nav class="sidebar" id="sidebar-container"></nav>
+
+        <main class="main-content">
+            <div class="top-bar">
+                <h1>Teachers Directory</h1>
+                <div class="flex" style="gap: 10px">
+                    <div class="search-bar">
+                        <input type="text" id="teacherSearch" placeholder="Search by name or subject...">
+                    </div>
+                    <button class="btn btn-primary" onclick="openTeacherModal()">+ Add Teacher</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Subject</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="teachersTable">
+                        </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <div id="teacherModal" class="modal hidden">
+        <div class="modal-content">
+            <h2 id="tModalTitle">Add Teacher</h2>
+            <br>
+            <form id="teacherForm">
+                <input type="hidden" id="teacherId">
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" id="tName" class="form-control" required>
+                </div>
+                <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label>Subject Specialization</label>
+                        <input type="text" id="tSubject" class="form-control" placeholder="e.g. Math" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Phone</label>
+                        <input type="tel" id="tPhone" class="form-control" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" id="tEmail" class="form-control" required>
+                </div>
+                <div class="flex" style="justify-content: flex-end; gap: 10px; margin-top: 1rem;">
+                    <button type="button" class="btn" onclick="closeTeacherModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Teacher</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script src="js/app.js"></script>
+    
+    <script>
+        // --- TEACHER MODULE LOGIC ---
+        
+        // 1. Initialize & Seed Data if empty
+        async function initTeachers() {
+            const teachers = await api.get(DB_KEYS.TEACHERS);
+            if(teachers.length === 0) {
+                // Seed Initial Data
+                await api.post(DB_KEYS.TEACHERS, { name: "Zaakir Hassan", subject: "Physics", email: "zaakir@school.com", phone: "618555631" });
+                await api.post(DB_KEYS.TEACHERS, { name: "Suheb hassan", subject: "History", email: "suheb@school.com", phone: "682145710" });
+            }
+            loadTeachers();
+        }
+
+        // 2. Render Table
+        async function loadTeachers(query = '') {
+            let teachers = await api.get(DB_KEYS.TEACHERS);
+            if(query) {
+                const lowerQ = query.toLowerCase();
+                teachers = teachers.filter(t => t.name.toLowerCase().includes(lowerQ) || t.subject.toLowerCase().includes(lowerQ));
+            }
+
+            const tbody = document.getElementById('teachersTable');
+            tbody.innerHTML = teachers.map(t => `
+                <tr>
+                    <td>#${t.id}</td>
+                    <td>
+                        <div class="flex" style="gap: 10px">
+                            <div style="width:30px; height:30px; background: #e2e8f0; border-radius:50%; display:flex; align-items:center; justify-content:center;">
+                                ${t.name.charAt(0)}
+                            </div>
+                            <strong>${t.name}</strong>
+                        </div>
+                    </td>
+                    <td><span class="badge" style="background: #e0f2fe; color: #0369a1;">${t.subject}</span></td>
+                    <td>${t.email}</td>
+                    <td>${t.phone}</td>
+                    <td>
+                        <button class="btn" onclick="editTeacher(${t.id})">✏️</button>
+                        <button class="btn" onclick="deleteTeacher(${t.id})" style="color:var(--danger)">🗑️</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // 3. Form Handling
+        const tModal = document.getElementById('teacherModal');
+        const tForm = document.getElementById('teacherForm');
+
+        window.openTeacherModal = () => {
+            tForm.reset();
+            document.getElementById('teacherId').value = '';
+            document.getElementById('tModalTitle').innerText = 'Add Teacher';
+            tModal.classList.remove('hidden');
+        };
+
+        window.closeTeacherModal = () => tModal.classList.add('hidden');
+
+        window.editTeacher = async (id) => {
+            const teachers = await api.get(DB_KEYS.TEACHERS);
+            const t = teachers.find(x => x.id == id);
+            document.getElementById('teacherId').value = t.id;
+            document.getElementById('tName').value = t.name;
+            document.getElementById('tSubject').value = t.subject;
+            document.getElementById('tEmail').value = t.email;
+            document.getElementById('tPhone').value = t.phone;
+            document.getElementById('tModalTitle').innerText = 'Edit Teacher';
+            tModal.classList.remove('hidden');
+        };
+
+        tForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('teacherId').value;
+            const data = {
+                name: document.getElementById('tName').value,
+                subject: document.getElementById('tSubject').value,
+                email: document.getElementById('tEmail').value,
+                phone: document.getElementById('tPhone').value
+            };
+
+            if(id) {
+                await api.put(DB_KEYS.TEACHERS, id, data);
+                UI.showToast('Teacher updated');
+            } else {
+                await api.post(DB_KEYS.TEACHERS, data);
+                UI.showToast('Teacher added');
+            }
+            closeTeacherModal();
+            loadTeachers();
+        });
+
+        window.deleteTeacher = async (id) => {
+            if(confirm('Remove this teacher?')) {
+                await api.delete(DB_KEYS.TEACHERS, id);
+                UI.showToast('Teacher removed', 'warning');
+                loadTeachers();
+            }
+        };
+
+        // Search Listener
+        document.getElementById('teacherSearch').addEventListener('input', (e) => loadTeachers(e.target.value));
+
+        // Start
+        initTeachers();
+    </script>
+</body>
+</html>

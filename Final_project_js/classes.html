@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Class & Timetable Management</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .timetable-grid {
+            display: grid;
+            grid-template-columns: 100px repeat(5, 1fr);
+            gap: 10px;
+            margin-top: 1rem;
+        }
+        .time-slot {
+            background: var(--bg-body);
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 0.85rem;
+            border: 1px dashed var(--border);
+        }
+        .day-header {
+            font-weight: bold;
+            text-align: center;
+            padding-bottom: 10px;
+            color: var(--primary);
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <nav class="sidebar" id="sidebar-container"></nav>
+
+        <main class="main-content">
+            <div class="top-bar">
+                <h1>Academic Structure</h1>
+                <button class="btn btn-primary" onclick="openClassModal()">+ Create New Class</button>
+            </div>
+
+            <div class="grid" style="grid-template-columns: 1fr 2fr;">
+                <div class="card">
+                    <h3>Available Classes</h3>
+                    <br>
+                    <div id="classList" class="flex" style="flex-direction: column; gap: 10px; align-items: stretch;">
+                        </div>
+                </div>
+
+                <div id="classDetailView" class="card">
+                    <div id="emptyDetail" style="text-align: center; padding: 3rem;">
+                        <p class="text-muted">Select a class from the left to manage subjects and timetable.</p>
+                    </div>
+                    
+                    <div id="activeDetail" class="hidden">
+                        <div class="flex" style="justify-content: space-between; margin-bottom: 1.5rem;">
+                            <h2 id="selectedClassName">Class 10-A</h2>
+                            <button class="btn btn-primary" style="font-size: 0.8rem;" onclick="openTimetableModal()">Edit Timetable</button>
+                        </div>
+
+                        <h4>Assigned Subjects & Teachers</h4>
+                        <table style="margin-top: 1rem;">
+                            <thead>
+                                <tr>
+                                    <th>Subject</th>
+                                    <th>Teacher</th>
+                                    <th>Weekly Periods</th>
+                                </tr>
+                            </thead>
+                            <tbody id="subjectTableBody"></tbody>
+                        </table>
+
+                        <h4 style="margin-top: 2rem;">Weekly Timetable</h4>
+                        <div class="timetable-grid" id="timetableDisplay">
+                            </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="classModal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Create New Class</h2>
+            <br>
+            <form id="classForm">
+                <div class="form-group">
+                    <label>Class Name (e.g., Grade 10-B)</label>
+                    <input type="text" id="classNameInput" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>Room Number</label>
+                    <input type="text" id="roomInput" class="form-control" required>
+                </div>
+                <div class="flex" style="justify-content: flex-end; gap: 10px;">
+                    <button type="button" class="btn" onclick="closeClassModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Class</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        // Data Keys
+        const CLASS_KEY = 'sms_classes';
+        let selectedClassId = null;
+
+        // 1. Load All Classes
+        async function loadClasses() {
+            const classes = await api.get(CLASS_KEY);
+            const container = document.getElementById('classList');
+            
+            if(classes.length === 0) {
+                container.innerHTML = `<p class="text-muted">No classes created yet.</p>`;
+                return;
+            }
+
+            container.innerHTML = classes.map(c => `
+                <div class="card" style="cursor:pointer; border: 1px solid ${selectedClassId == c.id ? 'var(--primary)' : 'var(--border)'}" onclick="viewClass(${c.id})">
+                    <div class="flex" style="justify-content: space-between;">
+                        <strong>${c.name}</strong>
+                        <span class="text-muted" style="font-size: 0.8rem;">Room: ${c.room}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 2. View Specific Class Details
+        async function viewClass(id) {
+            selectedClassId = id;
+            const classes = await api.get(CLASS_KEY);
+            const teachers = await api.get(DB_KEYS.TEACHERS);
+            const cls = classes.find(c => c.id == id);
+
+            document.getElementById('emptyDetail').classList.add('hidden');
+            document.getElementById('activeDetail').classList.remove('hidden');
+            document.getElementById('selectedClassName').innerText = cls.name;
+
+            // Render Subjects (Mock logic: assigning random teachers for demo)
+            const subjectTbody = document.getElementById('subjectTableBody');
+            const subjects = ['Mathematics', 'Science', 'History', 'English'];
+            
+            subjectTbody.innerHTML = subjects.map((sub, idx) => {
+                const teacher = teachers[idx % teachers.length] || { name: 'Unassigned' };
+                return `<tr>
+                    <td>${sub}</td>
+                    <td>${teacher.name}</td>
+                    <td>5</td>
+                </tr>`;
+            }).join('');
+
+            renderTimetable();
+            loadClasses(); // Refresh list to show active state
+        }
+
+        // 3. Render Timetable Grid
+        function renderTimetable() {
+            const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+            const times = ['08:00', '09:00', '10:00', '11:00', '12:00'];
+            const container = document.getElementById('timetableDisplay');
+            
+            let html = `<div></div>` + days.map(d => `<div class="day-header">${d}</div>`).join('');
+            
+            times.forEach(t => {
+                html += `<div class="time-slot" style="font-weight:bold">${t}</div>`;
+                days.forEach(d => {
+                    html += `<div class="time-slot">Subject</div>`;
+                });
+            });
+            
+            container.innerHTML = html;
+        }
+
+        // 4. Form Handling
+        const classModal = document.getElementById('classModal');
+        const classForm = document.getElementById('classForm');
+
+        window.openClassModal = () => classModal.classList.remove('hidden');
+        window.closeClassModal = () => classModal.classList.add('hidden');
+
+        classForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const newClass = {
+                name: document.getElementById('classNameInput').value,
+                room: document.getElementById('roomInput').value
+            };
+            await api.post(CLASS_KEY, newClass);
+            UI.showToast('Class created successfully');
+            closeClassModal();
+            loadClasses();
+        });
+
+        // Initialize
+        loadClasses();
+    </script>
+</body>
+</html>
